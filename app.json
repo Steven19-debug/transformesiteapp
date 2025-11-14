@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "transformesiteapp",
+    "slug": "snack-dd2b8767-e52e-429c-bccf-ce8dba9bd744",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "description": "Transformé un site Web en Apps",
+    "extra": {
+      "eas": {
+        "projectId": "19d9a6f6-8ec7-490d-9119-714fbd6d6f80"
+      }
+    }
+  }
+}
