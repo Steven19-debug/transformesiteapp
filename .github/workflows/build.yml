@@ -1,0 +1,51 @@
+name: Build Android APK & AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "Type de build: apk ou aab"
+        required: true
+        default: "apk"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Setup Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure EAS
+        run: eas build:configure
+
+      - name: Build Android
+        run: |
+          if [ "${{ github.event.inputs.build_type }}" = "apk" ]; then
+            eas build --platform android --profile preview --non-interactive --output app.apk
+          else
+            eas build --platform android --profile production --non-interactive --output app.aab
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-build
+          path: "*.apk, *.aab"
