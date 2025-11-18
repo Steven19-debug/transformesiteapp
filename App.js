@@ -1,219 +1,141 @@
-// App.js
-import React, { useState, useRef } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
-import { WebView } from 'react-native-webview';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons'; // ✅ icônes
+  Alert,
+  Linking,
+} from "react-native";
 
 export default function App() {
-  const [url, setUrl] = useState('');
-  const [currentUrl, setCurrentUrl] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const webViewRef = useRef(null);
-  const [canGoBack, setCanGoBack] = useState(false);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [buildType, setBuildType] = useState("APK");
 
-  const handleOpenSite = () => {
-    let formattedUrl = url.trim();
-    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
-      formattedUrl = 'https://' + formattedUrl;
+  const GITHUB_TOKEN = "TON_TOKEN_ICI";
+
+  // Lancer le workflow
+  const triggerWorkflow = async () => {
+    if (!repoUrl) return Alert.alert("Erreur", "Coller l'URL du dépôt GitHub !");
+
+    const parts = repoUrl.replace("https://github.com/", "").replace(".git", "").split("/");
+    if (parts.length !== 2) return Alert.alert("Erreur", "URL invalide !");
+    const [owner, repo] = parts;
+
+    try {
+      // 1️⃣ Déclencher le workflow
+      const dispatchResponse = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/actions/workflows/build.yml/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            "Accept": "application/vnd.github+json",
+            "Authorization": `Bearer ${GITHUB_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ref: "main", inputs: { build_type: buildType } }),
+        }
+      );
+
+      if (!dispatchResponse.ok) {
+        const text = await dispatchResponse.text();
+        return Alert.alert("Erreur déclenchement", text);
+      }
+
+      Alert.alert("Build lancé !", "L'application récupérera automatiquement le fichier.");
+
+      // 2️⃣ Surveiller le workflow et récupérer l'artifact
+      setTimeout(async () => {
+        try {
+          const runsResponse = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/actions/runs?branch=main&event=workflow_dispatch`,
+            {
+              headers: { Authorization: `Bearer ${GITHUB_TOKEN}` },
+            }
+          );
+          const runsData = await runsResponse.json();
+          if (!runsData.workflow_runs || runsData.workflow_runs.length === 0) {
+            return Alert.alert("Erreur", "Aucun workflow trouvé.");
+          }
+          const latestRunId = runsData.workflow_runs[0].id;
+
+          const artifactsResponse = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/actions/runs/${latestRunId}/artifacts`,
+            { headers: { Authorization: `Bearer ${GITHUB_TOKEN}` } }
+          );
+          const artifactsData = await artifactsResponse.json();
+          if (!artifactsData.artifacts || artifactsData.artifacts.length === 0) {
+            return Alert.alert("Erreur", "Aucun artifact trouvé.");
+          }
+
+          const artifact = artifactsData.artifacts.find(a =>
+            a.name.toLowerCase().includes(buildType.toLowerCase())
+          );
+          if (!artifact) return Alert.alert("Erreur", `Artifact ${buildType} non trouvé.`);
+
+          const downloadUrl = `${artifact.archive_download_url}`;
+          Linking.openURL(downloadUrl); // ouvre le fichier dans le navigateur pour téléchargement
+        } catch (err) {
+          Alert.alert("Erreur récupération artifact", err.message);
+        }
+      }, 10000); // attente 10s pour que le workflow commence
+    } catch (err) {
+      Alert.alert("Erreur", err.message);
     }
-    setCurrentUrl(formattedUrl);
-    setError(false);
-    setLoading(true);
   };
 
-  // --- Écran WebView ---
-  if (currentUrl) {
-    return (
-      <View style={{ flex: 1 }}>
-        {/* Barre de navigation */}
-        <View style={styles.navBar}>
-          {/* Bouton Retour */}
-          <TouchableOpacity
-            onPress={() => { if (canGoBack) webViewRef.current.goBack(); }}
-            style={[styles.navButton, !canGoBack && { opacity: 0.4 }]}
-            disabled={!canGoBack}
-          >
-            <Ionicons name="arrow-back-circle" size={30} color="#fff" />
-          </TouchableOpacity>
-
-          {/* Bouton Recharger */}
-          <TouchableOpacity
-            onPress={() => webViewRef.current.reload()}
-            style={styles.navButton}
-          >
-            <MaterialIcons name="refresh" size={30} color="#fff" />
-          </TouchableOpacity>
-
-          {/* Bouton Fermer */}
-          <TouchableOpacity
-            onPress={() => setCurrentUrl(null)}
-            style={styles.navButton}
-          >
-            <Ionicons name="close-circle" size={30} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Loader */}
-        {loading && (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#0a84ff" />
-            <Text style={styles.loadingText}>Chargement...</Text>
-          </View>
-        )}
-
-        {/* Erreur */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Impossible de charger le site</Text>
-            <TouchableOpacity onPress={() => setCurrentUrl(null)} style={styles.retryButton}>
-              <Text style={styles.retryText}>↩️ Retour</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* WebView */}
-        {!error && (
-          <WebView
-            ref={webViewRef}
-            source={{ uri: currentUrl }}
-            onLoadEnd={() => setLoading(false)}
-            onError={() => {
-              setError(true);
-              setLoading(false);
-            }}
-            onNavigationStateChange={(navState) => {
-              setCanGoBack(navState.canGoBack);
-            }}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState
-          />
-        )}
-      </View>
-    );
-  }
-
-  // --- Écran d'accueil ---
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🌐 Transforme ton site en application</Text>
+      <Text style={styles.title}>🌐 Transforme ton dépôt GitHub en App</Text>
+
       <TextInput
         style={styles.input}
-        placeholder="Entre ton lien (ex: monsite.com)"
-        value={url}
-        onChangeText={setUrl}
+        placeholder="Coller l'URL du dépôt GitHub"
+        value={repoUrl}
+        onChangeText={setRepoUrl}
         autoCapitalize="none"
-        keyboardType="url"
       />
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: url ? '#0a84ff' : '#ccc' }]}
-        disabled={!url}
-        onPress={handleOpenSite}
-      >
-        <Text style={styles.buttonText}>OUVRIR LE SITE</Text>
+
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.buildButton, buildType === "APK" && styles.activeButton]}
+          onPress={() => setBuildType("APK")}
+        >
+          <Text style={styles.buttonText}>APK</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.buildButton, buildType === "AAB" && styles.activeButton]}
+          onPress={() => setBuildType("AAB")}
+        >
+          <Text style={styles.buttonText}>AAB</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={styles.launchButton} onPress={triggerWorkflow}>
+        <Text style={styles.launchButtonText}>Lancer le build</Text>
       </TouchableOpacity>
+
       <Text style={styles.info}>
-        Saisis l’adresse de ton site pour le transformer en app instantanément.
+        Colle l'URL du dépôt GitHub et choisis APK ou AAB. L'application récupérera automatiquement le build.
       </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 25,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 25,
-    color: '#0a84ff',
-  },
+  container: { flex: 1, padding: 25, justifyContent: "center" },
+  title: { fontSize: 22, fontWeight: "700", marginBottom: 20, textAlign: "center" },
   input: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginBottom: 15,
-    fontSize: 16,
+    borderWidth: 1, borderColor: "#ccc", borderRadius: 10, padding: 12,
+    fontSize: 16, marginBottom: 15
   },
-  button: {
-    width: '100%',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  info: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 25,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  loaderContainer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#555',
-  },
-  errorContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  errorText: {
-    fontSize: 16,
-    color: 'red',
-    marginBottom: 15,
-  },
-  retryButton: {
-    backgroundColor: '#0a84ff',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  retryText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: '#0a84ff',
-    paddingVertical: 10,
-  },
-  navButton: {
-    paddingHorizontal: 10,
-  },
-  navButtonText: {
-    fontSize: 20,
-    color: '#fff',
-  },
+  buttonRow: { flexDirection: "row", justifyContent: "space-around", marginBottom: 20 },
+  buildButton: { paddingVertical: 12, paddingHorizontal: 25, borderRadius: 10, backgroundColor: "#ccc" },
+  activeButton: { backgroundColor: "#0a84ff" },
+  buttonText: { color: "#fff", fontWeight: "700" },
+  launchButton: { backgroundColor: "#0a84ff", paddingVertical: 15, borderRadius: 10, alignItems: "center" },
+  launchButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  info: { textAlign: "center", color: "#666", marginTop: 25 },
 });
