@@ -13,7 +13,7 @@ export default function App() {
   const [repoUrl, setRepoUrl] = useState("");
   const [buildType, setBuildType] = useState("APK");
 
-  const GITHUB_TOKEN = "TON_TOKEN_ICI";
+  const GITHUB_TOKEN = " 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";
 
   // Lancer le workflow
   const triggerWorkflow = async () => {
