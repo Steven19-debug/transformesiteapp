@@ -47,5 +47,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
         with:
-          name: android-build
-          path: "*.apk, *.aab"
+          name: android-${{ github.event.inputs.build_type }}
+          path: |
+            *.apk
+            *.aab
