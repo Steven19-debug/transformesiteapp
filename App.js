@@ -14,7 +14,7 @@ import { WebView } from 'react-native-webview';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 
 // ⚠️ Mets ton vrai token ici :
-const GITHUB_TOKEN = "YOUR_GITHUB_TOKEN_HERE";
+const GITHUB_TOKEN = "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";
 
 export default function App() {
   const [url, setUrl] = useState('');
