@@ -1,53 +1,55 @@
-name: Build Android APK & AAB
+name: Build Android
 
 on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: "Type de build: apk ou aab"
+        description: 'Type de build: APK ou AAB'
         required: true
-        default: "apk"
+        default: 'APK'
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Récupérer le code
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2️⃣ Installer Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: Setup Java
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'zulu'
-          java-version: 17
-
-      - name: Install EAS CLI
-        run: npm install -g eas-cli
-
+      # 3️⃣ Installer les dépendances npm
       - name: Install dependencies
         run: npm install
 
-      - name: Configure EAS
-        run: eas build:configure
+      # 4️⃣ Configurer Expo avec le token sécurisé
+      - name: Configure Expo
+        run: npx eas login --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+      # 5️⃣ Build Android selon le type choisi
       - name: Build Android
         run: |
-          if [ "${{ github.event.inputs.build_type }}" = "apk" ]; then
-            eas build --platform android --profile preview --non-interactive --output app.apk
+          if [ "${{ github.event.inputs.build_type }}" == "APK" ]; then
+            echo "Building APK..."
+            npx eas build --platform android --profile preview --non-interactive
           else
-            eas build --platform android --profile production --non-interactive --output app.aab
+            echo "Building AAB..."
+            npx eas build --platform android --profile production --non-interactive
           fi
 
+      # 6️⃣ Upload des fichiers générés
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: android-${{ github.event.inputs.build_type }}
+          name: ${{ github.event.inputs.build_type }}
           path: |
-            *.apk
-            *.aab
+            # Ajuste le chemin selon où EAS place les fichiers finaux
+            ./dist/**/*.apk
+            ./dist/**/*.aab
