@@ -7,7 +7,8 @@ on:
         description: 'Type de build: APK ou AAB'
         required: true
         default: 'APK'
-        jobs:
+
+jobs:
   build:
     runs-on: ubuntu-latest
 
@@ -21,31 +22,33 @@ on:
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          # 3️⃣ Installer les dépendances npm
+
+      # 3️⃣ Installer les dépendances npm
       - name: Install dependencies
         run: npm install
 
       # 4️⃣ Configurer Expo avec le token sécurisé
       - name: Configure Expo
-        run: npx eas login --non-interactive
         env:
-        EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        # 5️⃣ Build Android selon le type choisi
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx eas login --non-interactive
+
+      # 5️⃣ Build Android selon le type choisi
       - name: Build Android
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           if [ "${{ github.event.inputs.build_type }}" == "APK" ]; then
             echo "Building APK..."
-            npx eas build --platform android --profile preview --non-interactive
+            npx eas build --platform android --profile preview --non-interactive --output ./build
           else
             echo "Building AAB..."
-            npx eas build --platform android --profile production --non-interactive
+            npx eas build --platform android --profile production --non-interactive --output ./build
           fi
-          # 6️⃣ Upload des fichiers générés
+
+      # 6️⃣ Upload des fichiers générés (si build local disponible)
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.inputs.build_type }}
-          path: |
-            # Ajuste le chemin selon où EAS place les fichiers finaux
-            ./dist/**/*.apk
-            ./dist/**/*.aab
+          path: ./build
