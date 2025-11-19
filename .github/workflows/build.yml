@@ -4,51 +4,47 @@ on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: 'Type de build: APK ou AAB'
+        description: "Type de build: APK ou AAB"
         required: true
-        default: 'APK'
+        default: "APK"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Récupérer le code
+      # 1️⃣ Cloner le repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ Installer Node.js
+      # 2️⃣ Installer Node
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      # 3️⃣ Installer les dépendances npm
+      # 3️⃣ Installer les dépendances du projet
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Configurer Expo avec le token sécurisé
-      - name: Configure Expo
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npx eas login --non-interactive
+      # 4️⃣ Installer EAS CLI (obligatoire)
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
 
-      # 5️⃣ Build Android selon le type choisi
-      - name: Build Android
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # 5️⃣ Login Expo avec le token
+      - name: Expo Login
+        run: eas login --token ${{ secrets.EXPO_TOKEN }}
+
+      # 6️⃣ Lancer le build
+      - name: Start EAS Build
         run: |
-          if [ "${{ github.event.inputs.build_type }}" == "APK" ]; then
-            echo "Building APK..."
-            npx eas build --platform android --profile preview --non-interactive --output ./build
+          if [ "${{ github.event.inputs.build_type }}" = "APK" ]; then
+            eas build --platform android --profile preview --non-interactive
           else
-            echo "Building AAB..."
-            npx eas build --platform android --profile production --non-interactive --output ./build
+            eas build --platform android --profile production --non-interactive
           fi
 
-      # 6️⃣ Upload des fichiers générés (si build local disponible)
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ github.event.inputs.build_type }}
-          path: ./build
+      # 7️⃣ Récupérer l’URL du build
+      - name: Get Build URL
+        run: eas build:list --limit 1
+
